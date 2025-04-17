@@ -36,8 +36,10 @@ class SimpleISISGame(QWidget):
 
         self.gen_button = QPushButton("Generate an instance")
         self.query_button = QPushButton("Request to oracle")
+        self.requests_left_label = QLabel("Requests left: 0")
         right_layout.addWidget(self.gen_button)
         right_layout.addWidget(self.query_button)
+        right_layout.addWidget(self.requests_left_label)
 
         right_layout.addWidget(QLabel("x (separated by ' , ')"))
         self.x_input = QTextEdit(); self.x_input.setFixedHeight(30)
@@ -69,17 +71,31 @@ class SimpleISISGame(QWidget):
         self.instance = ISISInstance(n, m, q)
         self.oracle = ISISOracle(self.instance.A, q, k)
         self.output.append("New instance generated.")
+        self.update_requests_left()
 
         if n == 2:
             self.ax.clear()
-            a1, a2 = self.instance.A[:,0], self.instance.A[:,1]
+            a1 = self.instance.A[:, 0]
+            a2 = self.instance.A[:, 1]
+
+            # Draw points
+            u = np.linspace(-5, 5, 11)
+            v = np.linspace(-5, 5, 11)
+            for i in u:
+                for j in v:
+                    point = i * a1 + j * a2
+                    self.ax.plot(point[0], point[1], 'ko', markersize=2)
+
+            # Draw base vectors
             self.ax.quiver(0, 0, a1[0], a1[1], angles='xy', scale_units='xy', scale=1, color='r')
             self.ax.quiver(0, 0, a2[0], a2[1], angles='xy', scale_units='xy', scale=1, color='b')
-            self.ax.set_xlim(-q//2, q//2)
-            self.ax.set_ylim(-q//2, q//2)
+
+            self.ax.set_xlim(-self.q_spin.value() // 2, self.q_spin.value() // 2)
+            self.ax.set_ylim(-self.q_spin.value() // 2, self.q_spin.value() // 2)
             self.ax.set_aspect('equal')
-            self.ax.grid(True)  # On affiche la grille
+            self.ax.grid(True)
             self.canvas.draw()
+
 
     def query_oracle(self):
         if not self.oracle:
@@ -88,6 +104,7 @@ class SimpleISISGame(QWidget):
         try:
             t = self.oracle.query()
             self.output.append(f"Oracle output t = {t}")
+            self.update_requests_left()
         except Exception as e:
             self.output.append(str(e))
 
@@ -105,6 +122,11 @@ class SimpleISISGame(QWidget):
                 self.output.append("Invalid solution.")
         except Exception as e:
             self.output.append(f"Error: {e}")
+    
+    def update_requests_left(self):
+        if self.oracle:
+            remaining = self.oracle.k - self.oracle.count
+            self.requests_left_label.setText(f"Requests left: {remaining}")
 
 
 if __name__ == "__main__":
