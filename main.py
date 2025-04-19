@@ -19,6 +19,11 @@ class SimpleISISGame(QWidget):
         self.m_spin = QSpinBox(); self.m_spin.setValue(4)
         self.q_spin = QSpinBox(); self.q_spin.setValue(97)
         self.k_spin = QSpinBox(); self.k_spin.setValue(5)
+        
+        self.n_spin.setFixedWidth(60)
+        self.m_spin.setFixedWidth(60)
+        self.q_spin.setFixedWidth(60)
+        self.k_spin.setFixedWidth(60)
 
         for label, spin in [("n = Dimension of x", self.n_spin), ("m = Number of equations", self.m_spin), ("q = Modulo used", self.q_spin), ("k = Maximum number of requests", self.k_spin)]:
             left_layout.addWidget(QLabel(label))
@@ -30,6 +35,8 @@ class SimpleISISGame(QWidget):
 
         # Right column -> graph + buttons
         right_layout = QVBoxLayout()
+        self.goal_label = QLabel("Goal: Find a short x with a t such that A·x ≡ t mod q")
+        #right_layout.addWidget(self.goal_label)
         self.canvas = FigureCanvas(Figure(figsize=(3, 3)))
         self.ax = self.canvas.figure.subplots()
         right_layout.addWidget(self.canvas)
@@ -40,13 +47,18 @@ class SimpleISISGame(QWidget):
         right_layout.addWidget(self.gen_button)
         right_layout.addWidget(self.query_button)
         right_layout.addWidget(self.requests_left_label)
+        right_layout.addWidget(self.goal_label)
 
-        right_layout.addWidget(QLabel("x (separated by ' , ')"))
+        self.dimension_x_label = QLabel("x with dimension - in format ' , '")
+        
         self.x_input = QTextEdit(); self.x_input.setFixedHeight(30)
+        right_layout.addWidget(self.dimension_x_label)
         right_layout.addWidget(self.x_input)
-
-        right_layout.addWidget(QLabel("t (separated by ' , ')"))
+        
+        self.dimension_t_label = QLabel("x with dimension - in format ' , '")
+        
         self.t_input = QTextEdit(); self.t_input.setFixedHeight(30)
+        right_layout.addWidget(self.dimension_t_label)
         right_layout.addWidget(self.t_input)
 
         self.verify_button = QPushButton("Check solution")
@@ -72,6 +84,8 @@ class SimpleISISGame(QWidget):
         self.oracle = ISISOracle(self.instance.A, q, k)
         self.output.append("New instance generated.")
         self.update_requests_left()
+        self.dimension_x_label.setText(f"x with dimension {n} in format ' , '")
+        self.dimension_t_label.setText(f"t with dimension {m} in format ' , '")
 
         if n == 2:
             self.ax.clear()
@@ -81,10 +95,12 @@ class SimpleISISGame(QWidget):
             # Draw points
             u = np.linspace(-5, 5, 11)
             v = np.linspace(-5, 5, 11)
+            q = self.q_spin.value()
             for i in u:
                 for j in v:
                     point = i * a1 + j * a2
-                    self.ax.plot(point[0], point[1], 'ko', markersize=2)
+                    if -q//2 <= point[0] <= q//2 and -q//2 <= point[1] <= q//2:
+                        self.ax.plot(point[0], point[1], 'ko', markersize=2)
 
             # Draw base vectors
             self.ax.quiver(0, 0, a1[0], a1[1], angles='xy', scale_units='xy', scale=1, color='r')
@@ -93,7 +109,14 @@ class SimpleISISGame(QWidget):
             self.ax.set_xlim(-self.q_spin.value() // 2, self.q_spin.value() // 2)
             self.ax.set_ylim(-self.q_spin.value() // 2, self.q_spin.value() // 2)
             self.ax.set_aspect('equal')
-            self.ax.grid(True)
+            self.ax.axhline(0, color='black', linewidth=1)
+            self.ax.axvline(0, color='black', linewidth=1)
+            
+            for spine in self.ax.spines.values():
+                spine.set_linewidth(0.5)
+                spine.set_color('gray')
+                
+            self.ax.grid(False)
             self.canvas.draw()
 
 
@@ -120,13 +143,26 @@ class SimpleISISGame(QWidget):
                 self.output.append("Valid solution.")
             else:
                 self.output.append("Invalid solution.")
+
+            # Draw t
+            if self.instance and self.instance.n == 2:
+                try:
+                    self.ax.plot(t[0], t[1], marker='x', color='green', markersize=8)
+                    self.canvas.draw()
+                except Exception as e:
+                    self.output.append(f"Error while plotting t: {e}")
+
         except Exception as e:
-            self.output.append(f"Error: {e}")
+                self.output.append(f"Error: {e}")
+            
     
     def update_requests_left(self):
         if self.oracle:
             remaining = self.oracle.k - self.oracle.count
             self.requests_left_label.setText(f"Requests left: {remaining}")
+            
+            # Disable the button
+            self.query_button.setEnabled(remaining > 0)
 
 
 if __name__ == "__main__":
